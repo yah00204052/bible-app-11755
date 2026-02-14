@@ -60,7 +60,7 @@ export default function DualLanguageVerseDisplay({
       {isDualLanguage ? (
         <div className="grid grid-cols-[auto_1fr_1fr] gap-3">
           {/* Verse Reference Column */}
-          <div className="text-xs font-semibold text-blue-600 pt-1 whitespace-nowrap">
+          <div className={`${textSizeClass} text-blue-600 pt-1 whitespace-nowrap`}>
             {verse.chapter}:{verse.verse}
           </div>
 
@@ -81,7 +81,7 @@ export default function DualLanguageVerseDisplay({
       ) : (
         <div className="grid grid-cols-[auto_1fr] gap-3">
           {/* Verse Reference Column */}
-          <div className="text-xs font-semibold text-blue-600 pt-1 whitespace-nowrap">
+          <div className={`${textSizeClass} text-blue-600 pt-1 whitespace-nowrap`}>
             {verse.chapter}:{verse.verse}
           </div>
 
