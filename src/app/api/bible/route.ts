@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Bible API configuration
 const BIBLE_API_KEY = process.env.BIBLE_API_KEY || '';
-const BIBLE_API_URL = 'https://api.scripture.api.bible/v1';
+const BIBLE_API_URL = 'https://rest.api.bible/v1';
 
 // Bible ID mappings for API.Bible
 const BIBLE_IDS: { [key: string]: string } = {
-  'kjv': 'de4e12af7f28f599-02', // KJV
-  'niv': 'de4e12af7f28f599-01', // NIV
+  'kjv': 'de4e12af7f28f599-02', // King James Version
   'web': '9879dbb7cfe39e4d-04', // World English Bible
   'ccb': '3e27b3e43e1df61d-01', // Chinese Contemporary Bible (CCB - 当代译本圣经)
   'cunpss': 'ccb9229763033d43-01', // Chinese Union Version Simplified (CUNPSS - 和合本简体)
@@ -69,24 +68,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Fetch chapter from Bible API
-    const chapterResponse = await fetch(
-      `${BIBLE_API_URL}/bibles/${bibleId}/chapters/${apiBookId}.${chapter}?content-type=text&include-verse-numbers=true`,
-      {
-        headers: {
-          'api-key': BIBLE_API_KEY,
-        },
-        cache: 'force-cache',
-      }
-    );
-
-    if (!chapterResponse.ok) {
-      throw new Error(`Bible API returned ${chapterResponse.status}`);
-    }
-
-    const chapterData = await chapterResponse.json();
-
-    // Fetch verses for this chapter to get individual verses
+    // Fetch individual verses to get the text
     const versesResponse = await fetch(
       `${BIBLE_API_URL}/bibles/${bibleId}/chapters/${apiBookId}.${chapter}/verses`,
       {
@@ -98,26 +80,52 @@ export async function GET(request: NextRequest) {
     );
 
     if (!versesResponse.ok) {
-      throw new Error(`Bible API verses returned ${versesResponse.status}`);
+      const errorText = await versesResponse.text();
+      console.error('Bible API error response:', versesResponse.status, errorText);
+      throw new Error(`Bible API returned ${versesResponse.status}: ${errorText}`);
     }
 
     const versesData = await versesResponse.json();
 
-    // Transform to our format
-    const verses = versesData.data.map((verse: any) => {
-      // Extract verse number from reference (e.g., "John 3:16" -> 16)
-      const verseMatch = verse.reference.match(/(\d+):(\d+)$/);
-      const verseNumber = verseMatch ? parseInt(verseMatch[2]) : 1;
+    // Fetch each verse individually to get the text content
+    const verses = await Promise.all(
+      versesData.data.map(async (verseInfo: any) => {
+        const verseNumber = parseInt(verseInfo.id.split('.')[2]);
 
-      return {
-        id: `${bookId}-${chapter}-${verseNumber}`,
-        orgId: bookId,
-        bookId: bookId,
-        chapter: parseInt(chapter),
-        verse: verseNumber,
-        text: verse.content?.replace(/\[\d+\]/g, '').trim() || '', // Remove verse numbers
-      };
-    });
+        // Fetch individual verse with content
+        const verseResponse = await fetch(
+          `${BIBLE_API_URL}/bibles/${bibleId}/verses/${verseInfo.id}?content-type=text&include-notes=false&include-titles=false&include-chapter-numbers=false&include-verse-numbers=false&include-verse-spans=false`,
+          {
+            headers: {
+              'api-key': BIBLE_API_KEY,
+            },
+            cache: 'force-cache',
+          }
+        );
+
+        if (!verseResponse.ok) {
+          return {
+            id: `${bookId}-${chapter}-${verseNumber}`,
+            orgId: bookId,
+            bookId: bookId,
+            chapter: parseInt(chapter),
+            verse: verseNumber,
+            text: '',
+          };
+        }
+
+        const verseData = await verseResponse.json();
+
+        return {
+          id: `${bookId}-${chapter}-${verseNumber}`,
+          orgId: bookId,
+          bookId: bookId,
+          chapter: parseInt(chapter),
+          verse: verseNumber,
+          text: verseData.data.content?.trim() || '',
+        };
+      })
+    );
 
     return NextResponse.json({ verses });
   } catch (error) {

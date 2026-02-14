@@ -59,9 +59,8 @@ export interface BibleVersion {
 // Available Bible versions/languages
 export const BIBLE_VERSIONS: BibleVersion[] = [
   // English versions (Bible API - scripture.api.bible)
-  { id: 'kjv', name: 'KJV', language: 'en' },
-  { id: 'niv', name: 'NIV', language: 'en' },
-  { id: 'web', name: 'WEB', language: 'en' },
+  { id: 'kjv', name: 'KJV (King James)', language: 'en' },
+  { id: 'web', name: 'WEB (World English)', language: 'en' },
 
   // Chinese versions (Bible API - scripture.api.bible)
   { id: 'ccb', name: 'CCB (当代译本圣经)', language: 'zh' },
