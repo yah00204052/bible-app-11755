@@ -23,8 +23,13 @@ export default function DualLanguageVerseDisplay({
   const isDualLanguage = languages.length === 2;
 
   // Determine which text goes where based on primaryLanguage
-  const chineseText = primaryLanguage === 'zh' ? verse.text : (translationMap[verse.id] || '(Translation not available)');
-  const englishText = primaryLanguage === 'en' ? verse.text : (translationMap[verse.id] || '(Translation not available)');
+  // In single language mode, verse.text always contains the correct language
+  const chineseText = primaryLanguage === 'zh'
+    ? verse.text
+    : (translationMap[verse.id] || verse.text);
+  const englishText = primaryLanguage === 'en'
+    ? verse.text
+    : (translationMap[verse.id] || verse.text);
 
   // Map font size to Tailwind classes
   const fontSizeClasses: Record<FontSize, string> = {
@@ -78,10 +83,10 @@ export default function DualLanguageVerseDisplay({
             {verse.chapter}:{verse.verse}
           </div>
 
-          {/* Content Column */}
+          {/* Content Column - show based on primary language */}
           <div>
             <p className={`text-gray-800 leading-relaxed ${textSizeClass}`}>
-              {languages.includes('zh') ? (translationMap[verse.id] || verse.text) : verse.text}
+              {languages.includes('zh') && !languages.includes('en') ? chineseText : englishText}
             </p>
           </div>
         </div>

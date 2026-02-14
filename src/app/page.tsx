@@ -55,21 +55,51 @@ export default function Home() {
       setLoading(true);
       setError('');
       try {
-        // Determine the language of the selected version
-        const versionLang = ['cus', 'cut', 'cns'].includes(selectedVersion) ? 'zh' : 'en';
+        const isDualLanguage = languages.length === 2;
+        const selectedVersionLang = ['cus', 'cns'].includes(selectedVersion) ? 'zh' : 'en';
+
+        // Determine which version to load based on language selection
+        let versionToLoad = selectedVersion;
+        let versionLang = selectedVersionLang;
+
+        // If only Chinese is selected but current version is English, use Chinese version
+        if (languages.includes('zh') && !languages.includes('en') && selectedVersionLang === 'en') {
+          versionToLoad = 'cus'; // Default Chinese version
+          versionLang = 'zh';
+        }
+        // If only English is selected but current version is Chinese, use English version
+        else if (languages.includes('en') && !languages.includes('zh') && selectedVersionLang === 'zh') {
+          versionToLoad = 'kjv'; // Default English version
+          versionLang = 'en';
+        }
+
         setPrimaryLanguage(versionLang);
 
-        // Use the selected version
-        const data = await getChapter(selectedBookId, selectedChapter, selectedVersion);
+        // Load the primary version
+        const data = await getChapter(selectedBookId, selectedChapter, versionToLoad);
         setVerses(data);
-        addToReadingHistory(selectedBookId, selectedChapter);
+
+        // Check if there's a target verse from search
+        const scrollTarget = sessionStorage.getItem('scrollToVerse');
+        let targetVerse = 1;
+        if (scrollTarget) {
+          try {
+            const parsed = JSON.parse(scrollTarget);
+            if (parsed.bookId === selectedBookId && parsed.chapter === selectedChapter) {
+              targetVerse = parsed.verse;
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+
+        addToReadingHistory(selectedBookId, selectedChapter, targetVerse);
         setReadingHistory(getReadingHistory()); // Refresh history after adding
 
         // In dual language mode, load the other language
-        const isDualLanguage = languages.length === 2;
         if (isDualLanguage && languages.includes('zh') && languages.includes('en')) {
           // Load the opposite language
-          const otherVersion = versionLang === 'zh' ? 'kjv' : 'cus'; // Default other language version
+          const otherVersion = versionLang === 'zh' ? 'kjv' : 'cus';
 
           const otherData = await getChapter(selectedBookId, selectedChapter, otherVersion);
           const map: { [key: string]: string } = {};

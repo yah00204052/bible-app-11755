@@ -61,7 +61,7 @@ export default function ControlPanel({
       if (match) {
         const [, bookQuery, chapterStr, verseStr] = match;
         const chapter = parseInt(chapterStr);
-        const verse = verseStr ? parseInt(verseStr) : undefined;
+        const targetVerse = verseStr ? parseInt(verseStr) : 1;
 
         // Find book by abbreviation or name (partial match)
         const foundBook = books.find(b =>
@@ -75,15 +75,29 @@ export default function ControlPanel({
           onChapterChange(chapter);
           setSearchQuery(''); // Clear search after navigation
 
-          // If verse number provided, scroll to it after content loads
-          if (verse) {
-            // Small delay to allow content to load
+          // Store target verse in sessionStorage for popup to use
+          if (targetVerse > 1) {
+            sessionStorage.setItem('scrollToVerse', JSON.stringify({
+              bookId: foundBook.id,
+              chapter: chapter,
+              verse: targetVerse
+            }));
+
+            // Scroll preview to target verse after a delay
             setTimeout(() => {
-              const verseElement = document.getElementById(`verse-${foundBook.id}-${chapter}-${verse}`);
+              const verseElement = document.getElementById(`preview-verse-${targetVerse}`);
               if (verseElement) {
+                // Scroll the verse into view within its container
                 verseElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                // Highlight briefly
+                verseElement.style.backgroundColor = '#fef08a';
+                verseElement.style.transition = 'background-color 0.3s';
+                setTimeout(() => {
+                  verseElement.style.backgroundColor = '';
+                }, 2000);
               }
-            }, 500);
+            }, 800); // Increased delay to ensure content is loaded
           }
         }
       }
@@ -251,18 +265,22 @@ export default function ControlPanel({
           <h3 className="text-xs font-semibold text-gray-700 mb-1">
             Preview: {selectedBook?.name} {selectedChapter} ({verses.length} verses)
           </h3>
-          <div className="bg-gray-50 border border-gray-300 rounded p-2 h-48 overflow-y-auto text-xs">
+          <div
+            id="preview-panel"
+            className="bg-gray-50 border border-gray-300 rounded p-2 h-48 overflow-y-auto text-xs"
+          >
             {verses.length > 0 ? (
               <>
-                {verses.slice(0, 10).map((verse) => (
-                  <div key={verse.id} className="mb-1 last:mb-0">
+                {verses.map((verse) => (
+                  <div
+                    key={verse.id}
+                    id={`preview-verse-${verse.verse}`}
+                    className="mb-1 last:mb-0"
+                  >
                     <span className="font-semibold text-blue-600">{verse.verse}.</span>{' '}
                     <span className="text-gray-700">{verse.text.substring(0, 100)}{verse.text.length > 100 ? '...' : ''}</span>
                   </div>
                 ))}
-                {verses.length > 10 && (
-                  <p className="text-[10px] text-gray-500 mt-1 italic">+{verses.length - 10} more verses</p>
-                )}
               </>
             ) : (
               <p className="text-gray-500 italic">Select chapter to preview</p>
@@ -279,13 +297,26 @@ export default function ControlPanel({
             {readingHistory.length > 0 ? (
               readingHistory.slice(0, 15).map((entry, index) => {
                 const book = books.find(b => b.id === entry.bookId);
+                const verseNum = entry.verse || 1;
                 return (
                   <button
                     key={index}
-                    onClick={() => onHistoryClick(entry.bookId, entry.chapter)}
+                    onClick={() => {
+                      onHistoryClick(entry.bookId, entry.chapter);
+                      // If verse is specified and not 1, scroll to it
+                      if (verseNum > 1) {
+                        sessionStorage.setItem('scrollToVerse', JSON.stringify({
+                          bookId: entry.bookId,
+                          chapter: entry.chapter,
+                          verse: verseNum
+                        }));
+                      }
+                    }}
                     className="w-full text-left text-xs px-1.5 py-0.5 rounded hover:bg-blue-100 transition mb-0.5 last:mb-0 block"
                   >
-                    <span className="font-medium text-blue-600">{book?.name || entry.bookId} {entry.chapter}</span>
+                    <span className="font-medium text-blue-600">
+                      {book?.name || entry.bookId} {entry.chapter}:{verseNum}
+                    </span>
                     <span className="text-[10px] text-gray-500 ml-2">
                       {new Date(entry.timestamp).toLocaleDateString()}
                     </span>

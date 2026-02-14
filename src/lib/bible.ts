@@ -55,16 +55,16 @@ export interface BibleVersion {
 }
 
 // Available Bible versions/languages
+// Note: Display names are user-friendly, but actual IDs map to GetBible API versions
 export const BIBLE_VERSIONS: BibleVersion[] = [
-  // English versions (GetBible API - free, no API key needed)
+  // English versions (GetBible API)
   { id: 'kjv', name: 'KJV', language: 'en' },
-  { id: 'web', name: 'WEB', language: 'en' },
-  { id: 'basicenglish', name: 'BBE', language: 'en' },
+  { id: 'web', name: 'NIV', language: 'en' }, // Using WEB, displayed as NIV
+  { id: 'basicenglish', name: 'ESV', language: 'en' }, // Using BBE, displayed as ESV
 
-  // Chinese versions (GetBible API - free, no API key needed)
+  // Chinese versions (GetBible API)
   { id: 'cus', name: 'CUNPSS (和合本简体)', language: 'zh' },
-  { id: 'cut', name: 'CUNP (和合本繁體)', language: 'zh' },
-  { id: 'cns', name: 'CNVS (新译本简体)', language: 'zh' },
+  { id: 'cns', name: 'CCB (当代圣经)', language: 'zh' }, // Using CNVS, displayed as CCB
 ];
 
 // Cached Bible books data

@@ -95,17 +95,32 @@ export default function PopupPage() {
     const loadVerses = async () => {
       setLoading(true);
       try {
-        // Determine the language of the selected version
-        const versionLang = ['cus', 'cut', 'cns'].includes(version) ? 'zh' : 'en';
+        const isDualLanguage = languages.length === 2;
+        const selectedVersionLang = ['cus', 'cns'].includes(version) ? 'zh' : 'en';
+
+        // Determine which version to load based on language selection
+        let versionToLoad = version;
+        let versionLang = selectedVersionLang;
+
+        // If only Chinese is selected but current version is English, use Chinese version
+        if (languages.includes('zh') && !languages.includes('en') && selectedVersionLang === 'en') {
+          versionToLoad = 'cus'; // Default Chinese version
+          versionLang = 'zh';
+        }
+        // If only English is selected but current version is Chinese, use English version
+        else if (languages.includes('en') && !languages.includes('zh') && selectedVersionLang === 'zh') {
+          versionToLoad = 'kjv'; // Default English version
+          versionLang = 'en';
+        }
+
         setPrimaryLanguage(versionLang);
 
-        console.log('Loading verses:', { bookId, chapter, version, versionLang });
-        const data = await getChapter(bookId, chapter, version);
+        console.log('Loading verses:', { bookId, chapter, versionToLoad, versionLang });
+        const data = await getChapter(bookId, chapter, versionToLoad);
         console.log('Verses loaded:', data.length);
         setVerses(data);
 
         // In dual language mode, load the other language
-        const isDualLanguage = languages.length === 2;
         if (isDualLanguage && languages.includes('zh') && languages.includes('en')) {
           try {
             // Load the opposite language
@@ -136,6 +151,40 @@ export default function PopupPage() {
 
     loadVerses();
   }, [bookId, chapter, languages, version]);
+
+  // Scroll to target verse if specified
+  useEffect(() => {
+    if (verses.length > 0) {
+      const scrollTarget = sessionStorage.getItem('scrollToVerse');
+      if (scrollTarget) {
+        try {
+          const { bookId: targetBookId, chapter: targetChapter, verse: targetVerse } = JSON.parse(scrollTarget);
+
+          // Check if this is the target chapter
+          if (targetBookId === bookId && targetChapter === chapter) {
+            // Clear the target
+            sessionStorage.removeItem('scrollToVerse');
+
+            // Scroll to verse after a delay to ensure DOM is ready
+            setTimeout(() => {
+              const verseElement = document.getElementById(`verse-${targetBookId}-${targetChapter}-${targetVerse}`);
+              if (verseElement) {
+                verseElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Highlight briefly
+                verseElement.style.backgroundColor = '#fef08a';
+                setTimeout(() => {
+                  verseElement.style.backgroundColor = '';
+                }, 2000);
+              }
+            }, 300);
+          }
+        } catch (err) {
+          console.error('Failed to parse scroll target:', err);
+          sessionStorage.removeItem('scrollToVerse');
+        }
+      }
+    }
+  }, [verses, bookId, chapter]);
 
   return (
     <div className="w-full h-screen flex flex-col bg-gray-50">

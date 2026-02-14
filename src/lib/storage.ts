@@ -11,6 +11,7 @@ export interface Bookmark {
 export interface ReadingHistory {
   bookId: string;
   chapter: number;
+  verse?: number; // Starting verse, defaults to 1 if not specified
   timestamp: number;
 }
 
@@ -165,20 +166,21 @@ export function getReadingHistory(): ReadingHistory[] {
 /**
  * Add to reading history
  */
-export function addToReadingHistory(bookId: string, chapter: number): void {
+export function addToReadingHistory(bookId: string, chapter: number, verse?: number): void {
   if (typeof window === 'undefined') return;
   const history = getReadingHistory();
-  
+
   // Remove if already exists (to avoid duplicates)
-  const filtered = history.filter((h) => !(h.bookId === bookId && h.chapter === chapter));
-  
+  const filtered = history.filter((h) => !(h.bookId === bookId && h.chapter === chapter && h.verse === verse));
+
   // Add to beginning with current timestamp
   filtered.unshift({
     bookId,
     chapter,
+    verse: verse || 1, // Default to verse 1 if not specified
     timestamp: Date.now(),
   });
-  
+
   // Keep only last 30 entries
   localStorage.setItem(HISTORY_KEY, JSON.stringify(filtered.slice(0, 30)));
 }
