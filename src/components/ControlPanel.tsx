@@ -104,19 +104,23 @@ export default function ControlPanel({
     }
   };
 
-  // Fuzzy search for books (supports both English and Chinese)
+  // Fuzzy search for books (supports English, Chinese, and Pinyin)
   const filteredBooks = useMemo(() => {
     if (!searchQuery.trim()) return books;
 
     const query = searchQuery.toLowerCase().trim();
+    const queryNoSpaces = query.replace(/\s/g, ''); // Remove spaces for pinyin matching
+
     return books.filter((book) => {
-      // Search in name, nameLong, abbreviation, ID, and Chinese name
+      // Search in name, nameLong, abbreviation, ID, Chinese name, pinyin, and pinyin abbreviation
       return (
         book.name.toLowerCase().includes(query) ||
         book.nameLong.toLowerCase().includes(query) ||
         book.abbreviation.toLowerCase().includes(query) ||
         book.id.toLowerCase().includes(query) ||
-        (book.nameChinese && book.nameChinese.includes(searchQuery.trim()))
+        (book.nameChinese && book.nameChinese.includes(searchQuery.trim())) ||
+        (book.pinyin && book.pinyin.toLowerCase().includes(queryNoSpaces)) ||
+        (book.pinyinAbbr && book.pinyinAbbr.toLowerCase().includes(queryNoSpaces))
       );
     });
   }, [books, searchQuery]);
