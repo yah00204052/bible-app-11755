@@ -134,6 +134,35 @@ export default function Home() {
 
   const selectedBook = books.find((b) => b.id === selectedBookId);
 
+  // Listen for popup ready message and respond with initial state
+  useEffect(() => {
+    if (!popupWindow || popupWindow.closed) return;
+
+    try {
+      const channel = new BroadcastChannel('bible_app');
+
+      channel.onmessage = (event) => {
+        if (event.data.type === 'popup_ready' && selectedBook) {
+          console.log('Popup is ready, sending initial state');
+          channel.postMessage({
+            bookId: selectedBookId,
+            chapter: selectedChapter,
+            bookName: selectedBook.name,
+            version: selectedVersion,
+            languages: languages,
+            fontSize: fontSize,
+          });
+        }
+      };
+
+      return () => {
+        channel.close();
+      };
+    } catch (err) {
+      console.warn('BroadcastChannel not available:', err);
+    }
+  }, [popupWindow, selectedBookId, selectedChapter, selectedBook, selectedVersion, languages, fontSize]);
+
   // Update popup window when selections change
   useEffect(() => {
     if (selectedBook && popupWindow && !popupWindow.closed) {
@@ -180,26 +209,7 @@ export default function Home() {
     } else {
       const newWindow = window.open('/popup', 'biblereader_popup', 'width=900,height=700,resizable=yes,scrollbars=yes');
       setPopupWindow(newWindow);
-
-      // Send initial state to the popup window after a brief delay to ensure it's ready
-      if (newWindow && selectedBook) {
-        setTimeout(() => {
-          try {
-            const channel = new BroadcastChannel('bible_app');
-            channel.postMessage({
-              bookId: selectedBookId,
-              chapter: selectedChapter,
-              bookName: selectedBook.name,
-              version: selectedVersion,
-              languages: languages,
-              fontSize: fontSize,
-            });
-            channel.close();
-          } catch (err) {
-            console.warn('BroadcastChannel not available:', err);
-          }
-        }, 100);
-      }
+      // Initial state will be sent when popup sends "popup_ready" message
     }
   };
 

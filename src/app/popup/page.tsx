@@ -42,6 +42,9 @@ export default function PopupPage() {
       };
 
       console.log('BroadcastChannel opened');
+
+      // Send "ready" message to main window to request initial state
+      channel.postMessage({ type: 'popup_ready' });
       return () => {
         channel.close();
       };
