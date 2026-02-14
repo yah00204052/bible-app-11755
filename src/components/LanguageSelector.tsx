@@ -17,8 +17,8 @@ export default function LanguageSelector({
         onClick={() => onLanguageToggle('en')}
         className={`px-3 py-2 rounded text-sm font-medium transition ${
           selectedLanguages.includes('en')
-            ? 'bg-white text-blue-600'
-            : 'bg-blue-500 text-white hover:bg-blue-600'
+            ? 'bg-blue-500 text-white hover:bg-blue-600'
+            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
         }`}
       >
         English
@@ -27,8 +27,8 @@ export default function LanguageSelector({
         onClick={() => onLanguageToggle('zh')}
         className={`px-3 py-2 rounded text-sm font-medium transition ${
           selectedLanguages.includes('zh')
-            ? 'bg-white text-blue-600'
-            : 'bg-blue-500 text-white hover:bg-blue-600'
+            ? 'bg-blue-500 text-white hover:bg-blue-600'
+            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
         }`}
       >
         中文

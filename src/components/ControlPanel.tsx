@@ -1,7 +1,7 @@
 'use client';
 
-import { BibleBook, BibleVersion, BIBLE_VERSIONS } from '@/lib/bible';
-import { Language, FontSize } from '@/lib/storage';
+import { BibleBook, BibleVersion, BIBLE_VERSIONS, BibleVerse } from '@/lib/bible';
+import { Language, FontSize, ReadingHistory } from '@/lib/storage';
 import { translations } from '@/lib/translations';
 import LanguageSelector from './LanguageSelector';
 import { useState, useMemo } from 'react';
@@ -13,12 +13,15 @@ interface ControlPanelProps {
   languages: Language[];
   selectedVersion: string;
   fontSize: FontSize;
+  verses: BibleVerse[];
+  readingHistory: ReadingHistory[];
   onBookChange: (bookId: string) => void;
   onChapterChange: (chapter: number) => void;
   onLanguageToggle: (language: Language) => void;
   onVersionChange: (version: string) => void;
   onFontSizeChange: (size: FontSize) => void;
   onOpenPopup: () => void;
+  onHistoryClick: (bookId: string, chapter: number) => void;
 }
 
 export default function ControlPanel({
@@ -28,19 +31,64 @@ export default function ControlPanel({
   languages,
   selectedVersion,
   fontSize,
+  verses,
+  readingHistory,
   onBookChange,
   onChapterChange,
   onLanguageToggle,
   onVersionChange,
   onFontSizeChange,
   onOpenPopup,
+  onHistoryClick,
 }: ControlPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const selectedBook = books.find((b) => b.id === selectedBookId);
   const chapters = selectedBook
     ? Array.from({ length: selectedBook.chapters }, (_, i) => i + 1)
     : [];
-  const t = translations[languages.includes('zh') ? 'zh' : 'en'];
+  const t = translations['en']; // Always use English for control panel
+
+  // Handle verse reference search (e.g., "mat 1", "mat 1:12")
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const query = searchQuery.trim();
+
+      // Check if query matches verse reference pattern (e.g., "mat 1", "mat 1:12")
+      const versePattern = /^([a-z]+)\s+(\d+)(?::(\d+))?$/i;
+      const match = query.match(versePattern);
+
+      if (match) {
+        const [, bookQuery, chapterStr, verseStr] = match;
+        const chapter = parseInt(chapterStr);
+        const verse = verseStr ? parseInt(verseStr) : undefined;
+
+        // Find book by abbreviation or name (partial match)
+        const foundBook = books.find(b =>
+          b.abbreviation.toLowerCase().startsWith(bookQuery.toLowerCase()) ||
+          b.name.toLowerCase().startsWith(bookQuery.toLowerCase()) ||
+          b.id.toLowerCase().startsWith(bookQuery.toLowerCase())
+        );
+
+        if (foundBook && chapter >= 1 && chapter <= foundBook.chapters) {
+          onBookChange(foundBook.id);
+          onChapterChange(chapter);
+          setSearchQuery(''); // Clear search after navigation
+
+          // If verse number provided, scroll to it after content loads
+          if (verse) {
+            // Small delay to allow content to load
+            setTimeout(() => {
+              const verseElement = document.getElementById(`verse-${foundBook.id}-${chapter}-${verse}`);
+              if (verseElement) {
+                verseElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }, 500);
+          }
+        }
+      }
+    }
+  };
 
   // Fuzzy search for books (supports both English and Chinese)
   const filteredBooks = useMemo(() => {
@@ -60,50 +108,40 @@ export default function ControlPanel({
   }, [books, searchQuery]);
 
   return (
-    <div className="w-full max-w-4xl mx-auto bg-white border border-gray-300 rounded-lg shadow-lg my-4 p-6">
+    <div className="w-full max-w-5xl mx-auto bg-white rounded-lg shadow my-3 p-4">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="font-bold text-2xl text-gray-900">{t.books}</h1>
-        <p className="text-sm text-gray-600 mt-1">Bible Reader Control Panel</p>
+      <div className="mb-3">
+        <h1 className="font-bold text-xl text-gray-900">Bible Reader Control</h1>
       </div>
 
       {/* Main Grid Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
 
-        {/* Languages */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
-          <LanguageSelector selectedLanguages={languages} onLanguageToggle={onLanguageToggle} />
-        </div>
-
-        {/* Font Size */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Font Size</label>
+        {/* Languages and Project Button */}
+        <div className="lg:col-span-2">
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Lang: <span className="font-bold text-blue-600">{languages.join('+').toUpperCase()}</span>
+          </label>
           <div className="flex gap-2">
-            {(['small', 'medium', 'large'] as FontSize[]).map((size) => (
-              <button
-                key={size}
-                onClick={() => onFontSizeChange(size)}
-                className={`flex-1 px-3 py-2 rounded text-xs font-medium ${
-                  fontSize === size
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                {size === 'small' ? 'A' : size === 'medium' ? 'A' : 'A'}
-                <span className="ml-1 text-xs">{size[0].toUpperCase()}</span>
-              </button>
-            ))}
+            <div className="flex-1">
+              <LanguageSelector selectedLanguages={languages} onLanguageToggle={onLanguageToggle} />
+            </div>
+            <button
+              onClick={onOpenPopup}
+              className="px-4 py-2 bg-green-600 text-white rounded font-semibold hover:bg-green-700 transition text-sm whitespace-nowrap"
+            >
+              🪟 Project
+            </button>
           </div>
         </div>
 
         {/* Version Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Version</label>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Version</label>
           <select
             value={selectedVersion}
             onChange={(e) => onVersionChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 text-sm"
+            className="w-full px-2 py-1.5 border border-gray-300 rounded bg-white text-gray-900 text-sm"
           >
             {BIBLE_VERSIONS.map((version) => (
               <option key={version.id} value={version.id}>
@@ -113,33 +151,55 @@ export default function ControlPanel({
           </select>
         </div>
 
-        {/* Search Field */}
+        {/* Font Size */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            {languages.includes('zh') ? '搜索书卷' : 'Search Books'}
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Font: <span className="font-bold text-blue-600">{fontSize.toUpperCase()}</span>
           </label>
+          <input
+            type="range"
+            min="0"
+            max="12"
+            step="1"
+            value={
+              fontSize === 'xs' ? 0 :
+              fontSize === 'sm' ? 1 :
+              fontSize === 'base' ? 2 :
+              fontSize === 'lg' ? 3 :
+              fontSize === 'xl' ? 4 :
+              fontSize === '2xl' ? 5 :
+              fontSize === '3xl' ? 6 :
+              fontSize === '4xl' ? 7 :
+              fontSize === '5xl' ? 8 :
+              fontSize === '6xl' ? 9 :
+              fontSize === '7xl' ? 10 :
+              fontSize === '8xl' ? 11 : 12
+            }
+            onChange={(e) => {
+              const value = parseInt(e.target.value);
+              const sizes: FontSize[] = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', '8xl', '9xl'];
+              onFontSizeChange(sizes[value]);
+            }}
+            className="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-500"
+          />
+        </div>
+
+        {/* Book Selection */}
+        <div className="lg:col-span-2">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Book / Search (e.g., "mat 1:12" + Enter)</label>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={languages.includes('zh') ? '输入书名...' : 'Type book name...'}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onKeyDown={handleSearchKeyDown}
+            placeholder="Type 'mat 1:12' + Enter to jump..."
+            className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm mb-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
-          {searchQuery && (
-            <p className="text-xs text-gray-500 mt-1">
-              {filteredBooks.length} {languages.includes('zh') ? '卷' : 'book(s)'} found
-            </p>
-          )}
-        </div>
-
-        {/* Book Selection */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t.books}</label>
           <select
             value={selectedBookId}
             onChange={(e) => onBookChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 text-sm"
-            size={6}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded bg-white text-gray-900 text-sm"
+            size={4}
           >
             {filteredBooks.map((book) => (
               <option key={book.id} value={book.id}>
@@ -150,58 +210,92 @@ export default function ControlPanel({
         </div>
 
         {/* Chapter Selection */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t.chapter}</label>
+        <div className="lg:col-span-2">
+          <label className="block text-xs font-medium text-gray-700 mb-1">Chapter</label>
           <select
             value={selectedChapter}
             onChange={(e) => onChapterChange(parseInt(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 text-sm"
+            className="w-full px-2 py-1.5 border border-gray-300 rounded bg-white text-gray-900 text-sm mb-1"
           >
             {chapters.map((chapter) => (
               <option key={chapter} value={chapter}>
-                {languages.includes('zh') ? `第 ${chapter} 章` : `Chapter ${chapter}`}
+                Ch {chapter}
               </option>
             ))}
           </select>
+          {/* Quick Chapter Buttons - Inline */}
+          {chapters.length > 0 && (
+            <div className="flex gap-1 flex-wrap">
+              {chapters.slice(0, Math.min(12, chapters.length)).map((chapter) => (
+                <button
+                  key={chapter}
+                  onClick={() => onChapterChange(chapter)}
+                  className={`px-2 py-0.5 rounded text-xs ${
+                    selectedChapter === chapter
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                  }`}
+                >
+                  {chapter}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Quick Chapter Buttons */}
-      {chapters.length > 0 && (
-        <div className="mt-6">
-          <p className="text-sm text-gray-600 mb-2">Quick Jump:</p>
-          <div className="flex gap-1 flex-wrap">
-            {chapters.slice(0, Math.min(12, chapters.length)).map((chapter) => (
-              <button
-                key={chapter}
-                onClick={() => onChapterChange(chapter)}
-                className={`px-3 py-1 rounded text-sm ${
-                  selectedChapter === chapter
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                }`}
-              >
-                {chapter}
-              </button>
-            ))}
-            {chapters.length > 12 && (
-              <span className="px-3 py-1 text-sm text-gray-600">+{chapters.length - 12} more</span>
+      {/* Preview and History - Full Width Side by Side */}
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        {/* Preview Panel */}
+        <div>
+          <h3 className="text-xs font-semibold text-gray-700 mb-1">
+            Preview: {selectedBook?.name} {selectedChapter} ({verses.length} verses)
+          </h3>
+          <div className="bg-gray-50 border border-gray-300 rounded p-2 h-48 overflow-y-auto text-xs">
+            {verses.length > 0 ? (
+              <>
+                {verses.slice(0, 10).map((verse) => (
+                  <div key={verse.id} className="mb-1 last:mb-0">
+                    <span className="font-semibold text-blue-600">{verse.verse}.</span>{' '}
+                    <span className="text-gray-700">{verse.text.substring(0, 100)}{verse.text.length > 100 ? '...' : ''}</span>
+                  </div>
+                ))}
+                {verses.length > 10 && (
+                  <p className="text-[10px] text-gray-500 mt-1 italic">+{verses.length - 10} more verses</p>
+                )}
+              </>
+            ) : (
+              <p className="text-gray-500 italic">Select chapter to preview</p>
             )}
           </div>
         </div>
-      )}
 
-      {/* Open Popup Button */}
-      <div className="mt-6 border-t border-gray-200 pt-6">
-        <button
-          onClick={onOpenPopup}
-          className="w-full px-6 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition shadow-md"
-        >
-          🪟 Open Popup Window
-        </button>
-
-        <div className="text-center text-sm text-gray-600 mt-3">
-          Current: <span className="font-semibold text-gray-800">{selectedBook?.name} {selectedChapter}</span>
+        {/* Reading History Panel */}
+        <div>
+          <h3 className="text-xs font-semibold text-gray-700 mb-1">
+            History ({readingHistory.length} items)
+          </h3>
+          <div className="bg-gray-50 border border-gray-300 rounded p-2 h-48 overflow-y-auto">
+            {readingHistory.length > 0 ? (
+              readingHistory.slice(0, 15).map((entry, index) => {
+                const book = books.find(b => b.id === entry.bookId);
+                return (
+                  <button
+                    key={index}
+                    onClick={() => onHistoryClick(entry.bookId, entry.chapter)}
+                    className="w-full text-left text-xs px-1.5 py-0.5 rounded hover:bg-blue-100 transition mb-0.5 last:mb-0 block"
+                  >
+                    <span className="font-medium text-blue-600">{book?.name || entry.bookId} {entry.chapter}</span>
+                    <span className="text-[10px] text-gray-500 ml-2">
+                      {new Date(entry.timestamp).toLocaleDateString()}
+                    </span>
+                  </button>
+                );
+              })
+            ) : (
+              <p className="text-gray-500 italic text-xs">No history yet</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -13,7 +13,8 @@ export default function PopupPage() {
   const [translationMap, setTranslationMap] = useState<{ [key: string]: string }>({});
   const [loading, setLoading] = useState(false);
   const [version, setVersion] = useState('kjv');
-  const [fontSize, setFontSize] = useState<FontSize>('medium');
+  const [fontSize, setFontSize] = useState<FontSize>('base');
+  const [primaryLanguage, setPrimaryLanguage] = useState<'en' | 'zh'>('en');
   const channelRef = useRef<BroadcastChannel | null>(null);
   const initialized = useRef(false);
 
@@ -32,7 +33,11 @@ export default function PopupPage() {
         if (newChapter !== undefined) setChapter(newChapter);
         if (newBookName) setBookName(newBookName);
         if (newVersion) setVersion(newVersion);
-        if (newLanguages) setLanguages(newLanguages);
+        if (newLanguages && Array.isArray(newLanguages)) {
+          // Remove duplicates and ensure valid languages
+          const uniqueLanguages = Array.from(new Set(newLanguages.filter((lang: Language) => lang === 'en' || lang === 'zh')));
+          setLanguages(uniqueLanguages.length > 0 ? uniqueLanguages : ['en']);
+        }
         if (newFontSize) setFontSize(newFontSize);
       };
 
@@ -58,7 +63,19 @@ export default function PopupPage() {
         if (savedChapter) setChapter(parseInt(savedChapter));
         if (savedBookName) setBookName(savedBookName);
         if (savedVersion) setVersion(savedVersion);
-        if (savedLanguages) setLanguages(JSON.parse(savedLanguages));
+        if (savedLanguages) {
+          try {
+            const parsed = JSON.parse(savedLanguages);
+            if (Array.isArray(parsed)) {
+              // Remove duplicates and ensure valid languages
+              const uniqueLanguages = Array.from(new Set(parsed.filter((lang: Language) => lang === 'en' || lang === 'zh')));
+              setLanguages(uniqueLanguages.length > 0 ? uniqueLanguages : ['en']);
+            }
+          } catch (e) {
+            console.error('Failed to parse languages:', e);
+            setLanguages(['en']);
+          }
+        }
         if (savedFontSize) setFontSize(savedFontSize as FontSize);
       };
 
@@ -78,23 +95,32 @@ export default function PopupPage() {
     const loadVerses = async () => {
       setLoading(true);
       try {
-        console.log('Loading verses:', { bookId, chapter, version });
+        // Determine the language of the selected version
+        const versionLang = ['cus', 'cut', 'cns'].includes(version) ? 'zh' : 'en';
+        setPrimaryLanguage(versionLang);
+
+        console.log('Loading verses:', { bookId, chapter, version, versionLang });
         const data = await getChapter(bookId, chapter, version);
         console.log('Verses loaded:', data.length);
         setVerses(data);
 
-        if (languages.includes('zh')) {
+        // In dual language mode, load the other language
+        const isDualLanguage = languages.length === 2;
+        if (isDualLanguage && languages.includes('zh') && languages.includes('en')) {
           try {
-            console.log('Loading Chinese translation for:', { bookId, chapter });
-            const chineseData = await getChapter(bookId, chapter, 'cus');
+            // Load the opposite language
+            const otherVersion = versionLang === 'zh' ? 'kjv' : 'cus';
+
+            console.log('Loading other language translation for:', { bookId, chapter, otherVersion });
+            const otherData = await getChapter(bookId, chapter, otherVersion);
             const map: { [key: string]: string } = {};
-            chineseData.forEach((verse) => {
+            otherData.forEach((verse) => {
               map[verse.id] = verse.text;
             });
             setTranslationMap(map);
-            console.log('Chinese translation loaded:', Object.keys(map).length, 'verses');
+            console.log('Other language loaded:', Object.keys(map).length, 'verses');
           } catch (err) {
-            console.warn('Failed to load Chinese translation:', err);
+            console.warn('Failed to load other language:', err);
             setTranslationMap({});
           }
         } else {
@@ -113,23 +139,8 @@ export default function PopupPage() {
 
   return (
     <div className="w-full h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="bg-blue-600 text-white p-6 border-b border-gray-200 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">{bookName || 'Loading...'}</h1>
-          {chapter > 0 && <p className="text-blue-100">Chapter {chapter}</p>}
-          {languages.length > 0 && <p className="text-blue-100 text-sm mt-1">Languages: {languages.join(' + ')} | Version: {version.toUpperCase()}</p>}
-        </div>
-        <button
-          onClick={() => window.close()}
-          className="text-2xl font-bold text-white hover:bg-blue-700 rounded-full w-10 h-10 flex items-center justify-center"
-        >
-          ✕
-        </button>
-      </div>
-
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto px-4 py-3">
         {!bookId || chapter === 0 ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-lg text-gray-600">Waiting for selection from control panel...</div>
@@ -139,7 +150,7 @@ export default function PopupPage() {
             <div className="text-lg text-gray-600">Loading {bookName} {chapter}...</div>
           </div>
         ) : verses.length > 0 ? (
-          <div className="space-y-6 max-w-4xl">
+          <div className="space-y-0 max-w-4xl">
             {verses.map((verse) => (
               <DualLanguageVerseDisplay
                 key={verse.id}
@@ -148,6 +159,7 @@ export default function PopupPage() {
                 languages={languages}
                 translationMap={translationMap}
                 fontSize={fontSize}
+                primaryLanguage={primaryLanguage}
               />
             ))}
           </div>

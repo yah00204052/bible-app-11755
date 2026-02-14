@@ -21,7 +21,7 @@ const VERSION_KEY = 'bible_version';
 const FONT_SIZE_KEY = 'bible_font_size';
 
 export type Language = 'en' | 'zh';
-export type FontSize = 'small' | 'medium' | 'large';
+export type FontSize = 'xs' | 'sm' | 'base' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl' | '8xl' | '9xl';
 
 /**
  * Get selected languages
@@ -46,17 +46,20 @@ export function setLanguages(languages: Language[]): void {
 export function toggleLanguage(language: Language): Language[] {
   if (typeof window === 'undefined') return ['en'];
   const current = getLanguages();
-  const index = current.indexOf(language);
-  
+
+  // Remove duplicates if any exist
+  const uniqueCurrent = Array.from(new Set(current));
+  const index = uniqueCurrent.indexOf(language);
+
   if (index === -1) {
     // Add language
-    const updated = [...current, language].sort();
+    const updated = Array.from(new Set([...uniqueCurrent, language])).sort();
     setLanguages(updated);
     return updated;
   } else {
     // Remove language (but keep at least one)
-    if (current.length === 1) return current;
-    const updated = current.filter((l) => l !== language);
+    if (uniqueCurrent.length === 1) return uniqueCurrent;
+    const updated = uniqueCurrent.filter((l) => l !== language);
     setLanguages(updated);
     return updated;
   }
@@ -82,8 +85,18 @@ export function setVersion(version: string): void {
  * Get font size preference
  */
 export function getFontSize(): FontSize {
-  if (typeof window === 'undefined') return 'medium';
-  return (localStorage.getItem(FONT_SIZE_KEY) as FontSize) || 'medium';
+  if (typeof window === 'undefined') return 'base';
+  const saved = localStorage.getItem(FONT_SIZE_KEY) as FontSize;
+  // Migrate old values to new system
+  if (saved === 'small' as any) return 'sm';
+  if (saved === 'medium' as any) return 'base';
+  if (saved === 'large' as any) return 'lg';
+  // Validate the saved value is valid
+  const validSizes: FontSize[] = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', '8xl', '9xl'];
+  if (saved && validSizes.includes(saved)) {
+    return saved;
+  }
+  return 'base';
 }
 
 /**

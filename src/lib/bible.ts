@@ -56,17 +56,15 @@ export interface BibleVersion {
 
 // Available Bible versions/languages
 export const BIBLE_VERSIONS: BibleVersion[] = [
-  // English versions
-  { id: 'kjv', name: 'King James Version', language: 'en' },
-  { id: 'asv', name: 'American Standard Version', language: 'en' },
-  { id: 'akjv', name: 'American King James Version', language: 'en' },
-  { id: 'basicenglish', name: 'Bible in Basic English', language: 'en' },
+  // English versions (GetBible API - free, no API key needed)
+  { id: 'kjv', name: 'KJV', language: 'en' },
+  { id: 'web', name: 'WEB', language: 'en' },
+  { id: 'basicenglish', name: 'BBE', language: 'en' },
 
-  // Chinese versions
-  { id: 'cus', name: '和合本 (简体)', language: 'zh' },
-  { id: 'cut', name: '和合本 (繁體)', language: 'zh' },
-  { id: 'cns', name: '新译本 (简体)', language: 'zh' },
-  { id: 'cnt', name: '新譯本 (繁體)', language: 'zh' },
+  // Chinese versions (GetBible API - free, no API key needed)
+  { id: 'cus', name: 'CUNPSS (和合本简体)', language: 'zh' },
+  { id: 'cut', name: 'CUNP (和合本繁體)', language: 'zh' },
+  { id: 'cns', name: 'CNVS (新译本简体)', language: 'zh' },
 ];
 
 // Cached Bible books data

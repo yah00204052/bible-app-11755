@@ -1,15 +1,15 @@
 'use client';
 
 import { BibleVerse } from '@/lib/bible';
-import { isBookmarked, addBookmark, removeBookmark, Language, FontSize } from '@/lib/storage';
-import { useState, useEffect } from 'react';
+import { Language, FontSize } from '@/lib/storage';
 
 interface DualLanguageVerseDisplayProps {
   verse: BibleVerse;
   bookName: string;
   languages: Language[];
-  translationMap: { [key: string]: string }; // Map of verse ID to Chinese translation
+  translationMap: { [key: string]: string }; // Map of verse ID to other language translation
   fontSize?: FontSize;
+  primaryLanguage?: 'en' | 'zh'; // Which language is in verse.text
 }
 
 export default function DualLanguageVerseDisplay({
@@ -17,79 +17,74 @@ export default function DualLanguageVerseDisplay({
   bookName,
   languages,
   translationMap,
-  fontSize = 'medium',
+  fontSize = 'base',
+  primaryLanguage = 'en',
 }: DualLanguageVerseDisplayProps) {
-  const [bookmarked, setBookmarked] = useState(false);
-
-  useEffect(() => {
-    setBookmarked(isBookmarked(verse.bookId, verse.chapter, verse.verse));
-  }, [verse]);
-
-  const toggleBookmark = () => {
-    if (bookmarked) {
-      removeBookmark(verse.bookId, verse.chapter, verse.verse);
-    } else {
-      addBookmark({
-        bookId: verse.bookId,
-        chapter: verse.chapter,
-        verse: verse.verse,
-        text: verse.text,
-        timestamp: Date.now(),
-      });
-    }
-    setBookmarked(!bookmarked);
-  };
-
   const isDualLanguage = languages.length === 2;
 
+  // Determine which text goes where based on primaryLanguage
+  const chineseText = primaryLanguage === 'zh' ? verse.text : (translationMap[verse.id] || '(Translation not available)');
+  const englishText = primaryLanguage === 'en' ? verse.text : (translationMap[verse.id] || '(Translation not available)');
+
   // Map font size to Tailwind classes
-  const fontSizeClasses = {
-    small: 'text-sm',
-    medium: 'text-base',
-    large: 'text-lg',
+  const fontSizeClasses: Record<FontSize, string> = {
+    xs: 'text-xs',
+    sm: 'text-sm',
+    base: 'text-base',
+    lg: 'text-lg',
+    xl: 'text-xl',
+    '2xl': 'text-2xl',
+    '3xl': 'text-3xl',
+    '4xl': 'text-4xl',
+    '5xl': 'text-5xl',
+    '6xl': 'text-6xl',
+    '7xl': 'text-7xl',
+    '8xl': 'text-8xl',
+    '9xl': 'text-9xl',
   };
 
-  const textSizeClass = fontSizeClasses[fontSize];
+  const textSizeClass = fontSizeClasses[fontSize] || 'text-base';
 
   return (
-    <div className="group mb-4 p-4 bg-gray-50 rounded border border-gray-200 hover:bg-yellow-100 hover:border-yellow-400 hover:shadow-md hover:scale-[1.01] transition-all duration-150 cursor-default">
-      <div className="flex justify-between items-start mb-2">
-        <span className="font-semibold text-blue-600 group-hover:text-yellow-700 transition-colors duration-150">
-          {bookName} {verse.chapter}:{verse.verse}
-        </span>
-        <button
-          onClick={toggleBookmark}
-          className={`px-3 py-1 rounded text-sm ${
-            bookmarked
-              ? 'bg-yellow-400 text-yellow-900'
-              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-          }`}
-        >
-          {bookmarked ? '★' : '☆'}
-        </button>
-      </div>
-
+    <div
+      id={`verse-${verse.bookId}-${verse.chapter}-${verse.verse}`}
+      className="border-b border-gray-300 py-2 hover:bg-yellow-50 transition-colors duration-150 scroll-mt-4"
+    >
       {isDualLanguage ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {languages.includes('en') && (
-            <div className="pr-2 border-r md:border-r border-gray-300">
-              <p className={`text-gray-800 leading-relaxed ${textSizeClass}`}>{verse.text}</p>
-            </div>
-          )}
-          {languages.includes('zh') && (
-            <div className="pl-2">
-              <p className={`text-gray-800 leading-relaxed ${textSizeClass}`}>
-                {translationMap[verse.id] || '(Translation not available)'}
-              </p>
-            </div>
-          )}
+        <div className="grid grid-cols-[auto_1fr_1fr] gap-3">
+          {/* Verse Reference Column */}
+          <div className="text-xs font-semibold text-blue-600 pt-1 whitespace-nowrap">
+            {verse.chapter}:{verse.verse}
+          </div>
+
+          {/* Chinese Column (Left) */}
+          <div className="border-r border-gray-300 pr-3">
+            <p className={`text-gray-800 leading-relaxed ${textSizeClass}`}>
+              {chineseText}
+            </p>
+          </div>
+
+          {/* English Column (Right) */}
+          <div>
+            <p className={`text-gray-800 leading-relaxed ${textSizeClass}`}>
+              {englishText}
+            </p>
+          </div>
         </div>
-      ) : languages.includes('zh') ? (
-        <p className={`text-gray-800 leading-relaxed ${textSizeClass}`}>
-          {translationMap[verse.id] || verse.text}
-        </p>
       ) : (
-        <p className={`text-gray-800 leading-relaxed ${textSizeClass}`}>{verse.text}</p>
+        <div className="grid grid-cols-[auto_1fr] gap-3">
+          {/* Verse Reference Column */}
+          <div className="text-xs font-semibold text-blue-600 pt-1 whitespace-nowrap">
+            {verse.chapter}:{verse.verse}
+          </div>
+
+          {/* Content Column */}
+          <div>
+            <p className={`text-gray-800 leading-relaxed ${textSizeClass}`}>
+              {languages.includes('zh') ? (translationMap[verse.id] || verse.text) : verse.text}
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );

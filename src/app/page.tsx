@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { getBooks, getChapter, BibleBook, BibleVerse } from '@/lib/bible';
-import { getLastRead, addToReadingHistory, getLanguages, toggleLanguage, Language, getFontSize, setFontSize, FontSize } from '@/lib/storage';
+import { getLastRead, addToReadingHistory, getLanguages, toggleLanguage, Language, getFontSize, setFontSize, FontSize, getReadingHistory, ReadingHistory } from '@/lib/storage';
 import ControlPanel from '@/components/ControlPanel';
 
 export default function Home() {
@@ -15,14 +15,18 @@ export default function Home() {
   const [languages, setLanguagesState] = useState<Language[]>(['en']);
   const [translationMap, setTranslationMap] = useState<{ [key: string]: string }>({});
   const [selectedVersion, setSelectedVersion] = useState('kjv');
-  const [fontSize, setFontSizeState] = useState<FontSize>('medium');
+  const [fontSize, setFontSizeState] = useState<FontSize>('base');
   const [popupWindow, setPopupWindow] = useState<Window | null>(null);
+  const [readingHistory, setReadingHistory] = useState<ReadingHistory[]>([]);
+  const [primaryLanguage, setPrimaryLanguage] = useState<'en' | 'zh'>('en');
 
   useEffect(() => {
     const langs = getLanguages();
     setLanguagesState(langs);
     const savedFontSize = getFontSize();
     setFontSizeState(savedFontSize);
+    const history = getReadingHistory();
+    setReadingHistory(history);
 
     const loadBooks = async () => {
       try {
@@ -51,17 +55,30 @@ export default function Home() {
       setLoading(true);
       setError('');
       try {
+        // Determine the language of the selected version
+        const versionLang = ['cus', 'cut', 'cns'].includes(selectedVersion) ? 'zh' : 'en';
+        setPrimaryLanguage(versionLang);
+
+        // Use the selected version
         const data = await getChapter(selectedBookId, selectedChapter, selectedVersion);
         setVerses(data);
         addToReadingHistory(selectedBookId, selectedChapter);
+        setReadingHistory(getReadingHistory()); // Refresh history after adding
 
-        if (languages.includes('zh')) {
-          const chineseData = await getChapter(selectedBookId, selectedChapter, 'cus');
+        // In dual language mode, load the other language
+        const isDualLanguage = languages.length === 2;
+        if (isDualLanguage && languages.includes('zh') && languages.includes('en')) {
+          // Load the opposite language
+          const otherVersion = versionLang === 'zh' ? 'kjv' : 'cus'; // Default other language version
+
+          const otherData = await getChapter(selectedBookId, selectedChapter, otherVersion);
           const map: { [key: string]: string } = {};
-          chineseData.forEach((verse) => {
+          otherData.forEach((verse) => {
             map[verse.id] = verse.text;
           });
           setTranslationMap(map);
+        } else {
+          setTranslationMap({});
         }
       } catch (err) {
         setError('Failed to load chapter');
@@ -84,6 +101,11 @@ export default function Home() {
     setFontSizeState(size);
   };
 
+  const handleHistoryClick = (bookId: string, chapter: number) => {
+    setSelectedBookId(bookId);
+    setSelectedChapter(chapter);
+  };
+
   const selectedBook = books.find((b) => b.id === selectedBookId);
 
   const openPopupWindow = () => {
@@ -100,7 +122,7 @@ export default function Home() {
         localStorage.setItem('bible_popup_fontSize', fontSize);
       }
       
-      const newWindow = window.open('/popup', 'biblereader_popup', 'width=900,height=700,resizable=yes,scrollbars=yes');
+      const newWindow = window.open('/popup', 'biblereader_popup', 'width=900,height=700,resizable=yes,scrollbars=yes,location=no,toolbar=no,menubar=no,status=no');
       setPopupWindow(newWindow);
       
       // Send data via BroadcastChannel after a short delay to ensure popup is ready
@@ -152,8 +174,7 @@ export default function Home() {
   }, [selectedBookId, selectedChapter, selectedBook, selectedVersion, languages, fontSize, popupWindow]);
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Left Sidebar - Controls */}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
       {!booksLoading && books.length > 0 ? (
         <ControlPanel
           books={books}
@@ -161,6 +182,9 @@ export default function Home() {
           selectedChapter={selectedChapter}
           languages={languages}
           selectedVersion={selectedVersion}
+          fontSize={fontSize}
+          verses={verses}
+          readingHistory={readingHistory}
           onBookChange={(id) => {
             setSelectedBookId(id);
             setSelectedChapter(1);
@@ -168,45 +192,15 @@ export default function Home() {
           onChapterChange={setSelectedChapter}
           onLanguageToggle={handleLanguageToggle}
           onVersionChange={setSelectedVersion}
+          onFontSizeChange={handleFontSizeChange}
           onOpenPopup={openPopupWindow}
+          onHistoryClick={handleHistoryClick}
         />
       ) : (
-        <aside className="w-80 bg-white border-r border-gray-300 flex flex-col h-screen overflow-hidden">
-          <div className="p-4 border-b border-gray-200">
-            <p className="text-gray-600">Loading...</p>
-          </div>
-        </aside>
-      )}
-
-      {/* Main Content Area - Instructions */}
-      <main className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <h1 className="text-5xl font-bold text-gray-900 mb-4">Bible Reader</h1>
-          <p className="text-xl text-gray-600 mb-8">Click "Popup Window" in the sidebar to open the verses display</p>
-          
-          {selectedBook && (
-            <div className="mb-8 p-6 bg-white rounded-lg shadow-lg">
-              <p className="text-gray-700 text-lg">
-                Current Selection: <span className="font-bold text-blue-600">{selectedBook.name} {selectedChapter}</span>
-              </p>
-              <p className="text-gray-600 text-sm mt-2">
-                Languages: {languages.join(' + ')} | Version: {selectedVersion.toUpperCase()}
-              </p>
-            </div>
-          )}
-
-          <div className="text-gray-600 text-sm">
-            <p>Use the left sidebar to:</p>
-            <ul className="mt-3 space-y-2">
-              <li>✓ Select language (EN, ZH, or both)</li>
-              <li>✓ Choose Bible version</li>
-              <li>✓ Select book and chapter</li>
-              <li>✓ Navigate with Previous/Next buttons</li>
-              <li>✓ Click "Popup Window" to display verses</li>
-            </ul>
-          </div>
+        <div className="w-full max-w-4xl mx-auto bg-white border border-gray-300 rounded-lg shadow-lg p-6">
+          <p className="text-gray-600">Loading...</p>
         </div>
-      </main>
+      )}
     </div>
   );
 }
