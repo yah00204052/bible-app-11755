@@ -10,6 +10,7 @@ interface DualLanguageVerseDisplayProps {
   translationMap: { [key: string]: string }; // Map of verse ID to other language translation
   fontSize?: FontSize;
   primaryLanguage?: 'en' | 'zh'; // Which language is in verse.text
+  idPrefix?: string; // Optional prefix for verse IDs to avoid conflicts
 }
 
 export default function DualLanguageVerseDisplay({
@@ -19,6 +20,7 @@ export default function DualLanguageVerseDisplay({
   translationMap,
   fontSize = 'base',
   primaryLanguage = 'en',
+  idPrefix = '',
 }: DualLanguageVerseDisplayProps) {
   const isDualLanguage = languages.length === 2;
 
@@ -52,7 +54,7 @@ export default function DualLanguageVerseDisplay({
 
   return (
     <div
-      id={`verse-${verse.bookId}-${verse.chapter}-${verse.verse}`}
+      id={`${idPrefix}verse-${verse.bookId}-${verse.chapter}-${verse.verse}`}
       className="border-b border-gray-300 py-2 hover:bg-yellow-50 transition-colors duration-150 scroll-mt-4"
     >
       {isDualLanguage ? (
