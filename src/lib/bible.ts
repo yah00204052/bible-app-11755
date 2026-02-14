@@ -60,11 +60,11 @@ export interface BibleVersion {
 export const BIBLE_VERSIONS: BibleVersion[] = [
   // English versions (Bible API - scripture.api.bible)
   { id: 'kjv', name: 'KJV (King James)', language: 'en' },
-  { id: 'web', name: 'WEB (World English)', language: 'en' },
+  { id: 'niv', name: 'NIV (New International)', language: 'en' },
 
-  // Chinese versions (Bible API - scripture.api.bible)
-  { id: 'ccb', name: 'CCB (当代译本圣经)', language: 'zh' },
-  { id: 'cunpss', name: 'CUNPSS (和合本简体)', language: 'zh' },
+  // Chinese versions (GetBible API - no API key needed)
+  { id: 'cus', name: 'CUNPSS (和合本简体)', language: 'zh' },
+  { id: 'cns', name: 'CCB (当代圣经)', language: 'zh' },
 ];
 
 // Cached Bible books data
@@ -94,29 +94,65 @@ export async function getChapter(
   if (versesCache[cacheKey]) return versesCache[cacheKey];
 
   try {
-    // All versions now use our Next.js API route (Bible API)
-    const response = await fetch(
-      `/api/bible?version=${version}&bookId=${bookId}&chapter=${chapter}`,
-      {
-        cache: 'force-cache'
+    // Use GetBible API for Chinese versions, Bible API for English
+    const isChineseVersion = ['cus', 'cns'].includes(version);
+
+    if (isChineseVersion) {
+      // Use GetBible API for Chinese versions (free, no API key)
+      const getBibleBookId = toGetBibleId(bookId);
+
+      const response = await fetch(
+        `https://api.getbible.net/v2/${version}/${getBibleBookId}/${chapter}.json`,
+        {
+          headers: { 'Accept': 'application/json' },
+          cache: 'force-cache'
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`GetBible API returned ${response.status}`);
       }
-    );
 
-    if (!response.ok) {
-      throw new Error(`Bible API returned ${response.status}`);
+      const data = await response.json();
+
+      // Transform GetBible format to app format
+      const verses: BibleVerse[] = data.verses.map((verse: any) => ({
+        id: `${bookId}-${chapter}-${verse.verse}`,
+        orgId: bookId,
+        bookId: bookId,
+        chapter: parseInt(verse.chapter),
+        verse: parseInt(verse.verse),
+        text: verse.text,
+      }));
+
+      versesCache[cacheKey] = verses;
+      return verses;
+    } else {
+      // Use Bible API for English versions (requires API key)
+      const response = await fetch(
+        `/api/bible?version=${version}&bookId=${bookId}&chapter=${chapter}`,
+        {
+          cache: 'force-cache'
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Bible API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      versesCache[cacheKey] = data.verses;
+      return data.verses;
     }
-
-    const data = await response.json();
-
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    versesCache[cacheKey] = data.verses;
-    return data.verses;
 
   } catch (error) {
-    console.error(`Failed to fetch ${version}/${bookId} ${chapter}:`, error);
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`Failed to fetch ${version}/${bookId} ${chapter}:`, errorMsg);
 
     // Return error message instead of crashing
     return [{
@@ -125,7 +161,7 @@ export async function getChapter(
       bookId: bookId,
       chapter: chapter,
       verse: 1,
-      text: `[Unable to load chapter. Please check your internet connection or try a different version.]`,
+      text: `[Unable to load chapter. Error: ${errorMsg}. Please check your internet connection or try a different version.]`,
     }];
   }
 }

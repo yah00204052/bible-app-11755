@@ -41,32 +41,17 @@ export default function BibleModal({
       setLoading(true);
       try {
         const isDualLanguage = languages.length === 2;
-        const selectedVersionLang = ['ccb', 'cunpss'].includes(version) ? 'zh' : 'en';
+        const selectedVersionLang = ['cus', 'cns'].includes(version) ? 'zh' : 'en';
 
-        // Determine which version to load based on language selection
-        let versionToLoad = version;
-        let versionLang = selectedVersionLang;
+        setPrimaryLanguage(selectedVersionLang);
 
-        // If only Chinese is selected but current version is English, use Chinese version
-        if (languages.includes('zh') && !languages.includes('en') && selectedVersionLang === 'en') {
-          versionToLoad = 'ccb';
-          versionLang = 'zh';
-        }
-        // If only English is selected but current version is Chinese, use English version
-        else if (languages.includes('en') && !languages.includes('zh') && selectedVersionLang === 'zh') {
-          versionToLoad = 'kjv';
-          versionLang = 'en';
-        }
-
-        setPrimaryLanguage(versionLang as 'en' | 'zh');
-
-        const data = await getChapter(bookId, chapter, versionToLoad);
+        const data = await getChapter(bookId, chapter, version);
         setVerses(data);
 
         // In dual language mode, load the other language
         if (isDualLanguage && languages.includes('zh') && languages.includes('en')) {
           try {
-            const otherVersion = versionLang === 'zh' ? 'kjv' : 'ccb';
+            const otherVersion = selectedVersionLang === 'zh' ? 'kjv' : 'cus';
             const otherData = await getChapter(bookId, chapter, otherVersion);
             const map: { [key: string]: string } = {};
             otherData.forEach((verse) => {

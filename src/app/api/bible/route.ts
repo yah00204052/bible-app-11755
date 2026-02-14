@@ -4,12 +4,11 @@ import { NextRequest, NextResponse } from 'next/server';
 const BIBLE_API_KEY = process.env.BIBLE_API_KEY || '';
 const BIBLE_API_URL = 'https://rest.api.bible/v1';
 
-// Bible ID mappings for API.Bible
+// Bible ID mappings for API.Bible (English versions only)
+// Chinese versions use GetBible API instead
 const BIBLE_IDS: { [key: string]: string } = {
   'kjv': 'de4e12af7f28f599-02', // King James Version
-  'web': '9879dbb7cfe39e4d-04', // World English Bible
-  'ccb': '3e27b3e43e1df61d-01', // Chinese Contemporary Bible (CCB - 当代译本圣经)
-  'cunpss': 'ccb9229763033d43-01', // Chinese Union Version Simplified (CUNPSS - 和合本简体)
+  'niv': '78a9f6124f344018-01', // New International Version 2011
 };
 
 // Book abbreviation to API.Bible book ID mapping

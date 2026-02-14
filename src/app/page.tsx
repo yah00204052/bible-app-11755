@@ -1,9 +1,21 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { getBooks, getChapter, BibleBook, BibleVerse } from '@/lib/bible';
-import { getLastRead, addToReadingHistory, getLanguages, toggleLanguage, Language, getFontSize, setFontSize, FontSize, getReadingHistory, ReadingHistory } from '@/lib/storage';
+import { getLastRead, addToReadingHistory, getLanguages, toggleLanguage, Language, getFontSize, setFontSize, FontSize, getReadingHistory, ReadingHistory, getVersion, setVersion } from '@/lib/storage';
 import ControlPanel from '@/components/ControlPanel';
-import BibleModal from '@/components/BibleModal';
+
+// Validate version before component initialization
+const getValidVersion = (): string => {
+  if (typeof window === 'undefined') return 'kjv';
+  const savedVersion = getVersion();
+  const validVersions = ['kjv', 'niv', 'cus', 'cns'];
+  if (validVersions.includes(savedVersion)) {
+    return savedVersion;
+  }
+  // Reset to default if invalid
+  setVersion('kjv');
+  return 'kjv';
+};
 
 export default function Home() {
   const [books, setBooks] = useState<BibleBook[]>([]);
@@ -15,9 +27,9 @@ export default function Home() {
   const [error, setError] = useState('');
   const [languages, setLanguagesState] = useState<Language[]>(['en']);
   const [translationMap, setTranslationMap] = useState<{ [key: string]: string }>({});
-  const [selectedVersion, setSelectedVersion] = useState('kjv');
+  const [selectedVersion, setSelectedVersion] = useState(getValidVersion());
   const [fontSize, setFontSizeState] = useState<FontSize>('base');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [popupWindow, setPopupWindow] = useState<Window | null>(null);
   const [readingHistory, setReadingHistory] = useState<ReadingHistory[]>([]);
   const [primaryLanguage, setPrimaryLanguage] = useState<'en' | 'zh'>('en');
 
@@ -55,29 +67,27 @@ export default function Home() {
     const loadChapter = async () => {
       setLoading(true);
       setError('');
+      setVerses([]); // Clear previous verses immediately
       try {
         const isDualLanguage = languages.length === 2;
-        const selectedVersionLang = ['ccb', 'cunpss'].includes(selectedVersion) ? 'zh' : 'en';
+        const selectedVersionLang = ['cus', 'cns'].includes(selectedVersion) ? 'zh' : 'en';
 
-        // Determine which version to load based on language selection
-        let versionToLoad = selectedVersion;
-        let versionLang = selectedVersionLang;
+        setPrimaryLanguage(selectedVersionLang);
 
-        // If only Chinese is selected but current version is English, use Chinese version
-        if (languages.includes('zh') && !languages.includes('en') && selectedVersionLang === 'en') {
-          versionToLoad = 'ccb'; // Default Chinese version
-          versionLang = 'zh';
-        }
-        // If only English is selected but current version is Chinese, use English version
-        else if (languages.includes('en') && !languages.includes('zh') && selectedVersionLang === 'zh') {
-          versionToLoad = 'kjv'; // Default English version
-          versionLang = 'en';
-        }
-
-        setPrimaryLanguage(versionLang as 'en' | 'zh');
+        console.log('Loading chapter:', selectedBookId, selectedChapter, 'version:', selectedVersion);
 
         // Load the primary version
-        const data = await getChapter(selectedBookId, selectedChapter, versionToLoad);
+        const data = await getChapter(selectedBookId, selectedChapter, selectedVersion);
+
+        // Check if we got an error message instead of real verses
+        if (data.length === 1 && data[0].text.includes('[Unable to load chapter')) {
+          console.error('Failed to load chapter:', data[0].text);
+          setError(data[0].text);
+          setVerses([]);
+          setLoading(false);
+          return;
+        }
+
         setVerses(data);
 
         // Check if there's a target verse from search
@@ -100,7 +110,7 @@ export default function Home() {
         // In dual language mode, load the other language
         if (isDualLanguage && languages.includes('zh') && languages.includes('en')) {
           // Load the opposite language
-          const otherVersion = versionLang === 'zh' ? 'kjv' : 'ccb';
+          const otherVersion = selectedVersionLang === 'zh' ? 'kjv' : 'cus';
 
           const otherData = await getChapter(selectedBookId, selectedChapter, otherVersion);
           const map: { [key: string]: string } = {};
@@ -122,6 +132,28 @@ export default function Home() {
     loadChapter();
   }, [selectedBookId, selectedChapter, languages, selectedVersion]);
 
+  const selectedBook = books.find((b) => b.id === selectedBookId);
+
+  // Update popup window when selections change
+  useEffect(() => {
+    if (selectedBook && popupWindow && !popupWindow.closed) {
+      try {
+        const channel = new BroadcastChannel('bible_app');
+        channel.postMessage({
+          bookId: selectedBookId,
+          chapter: selectedChapter,
+          bookName: selectedBook.name,
+          version: selectedVersion,
+          languages: languages,
+          fontSize: fontSize,
+        });
+        channel.close();
+      } catch (err) {
+        console.warn('BroadcastChannel not available:', err);
+      }
+    }
+  }, [selectedBookId, selectedChapter, selectedBook, selectedVersion, languages, fontSize, popupWindow]);
+
   const handleLanguageToggle = (language: Language) => {
     const updated = toggleLanguage(language);
     setLanguagesState(updated);
@@ -137,14 +169,38 @@ export default function Home() {
     setSelectedChapter(chapter);
   };
 
-  const selectedBook = books.find((b) => b.id === selectedBookId);
-
-  const openModal = () => {
-    setIsModalOpen(true);
+  const handleVersionChange = (version: string) => {
+    setSelectedVersion(version);
+    setVersion(version); // Save to localStorage
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
+  const openPopupWindow = () => {
+    if (popupWindow && !popupWindow.closed) {
+      popupWindow.focus();
+    } else {
+      const newWindow = window.open('/popup', 'biblereader_popup', 'width=900,height=700,resizable=yes,scrollbars=yes');
+      setPopupWindow(newWindow);
+
+      // Send initial state to the popup window after a brief delay to ensure it's ready
+      if (newWindow && selectedBook) {
+        setTimeout(() => {
+          try {
+            const channel = new BroadcastChannel('bible_app');
+            channel.postMessage({
+              bookId: selectedBookId,
+              chapter: selectedChapter,
+              bookName: selectedBook.name,
+              version: selectedVersion,
+              languages: languages,
+              fontSize: fontSize,
+            });
+            channel.close();
+          } catch (err) {
+            console.warn('BroadcastChannel not available:', err);
+          }
+        }, 100);
+      }
+    }
   };
 
   return (
@@ -166,22 +222,12 @@ export default function Home() {
             }}
             onChapterChange={setSelectedChapter}
             onLanguageToggle={handleLanguageToggle}
-            onVersionChange={setSelectedVersion}
+            onVersionChange={handleVersionChange}
             onFontSizeChange={handleFontSizeChange}
-            onOpenPopup={openModal}
+            onOpenPopup={openPopupWindow}
             onHistoryClick={handleHistoryClick}
           />
 
-          <BibleModal
-            isOpen={isModalOpen}
-            onClose={closeModal}
-            bookId={selectedBookId}
-            chapter={selectedChapter}
-            bookName={selectedBook?.name || ''}
-            languages={languages}
-            version={selectedVersion}
-            fontSize={fontSize}
-          />
         </>
       ) : (
         <div className="w-full max-w-4xl mx-auto bg-white border border-gray-300 rounded-lg shadow-lg p-6">
