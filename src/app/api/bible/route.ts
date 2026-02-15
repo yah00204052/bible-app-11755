@@ -114,6 +114,11 @@ export async function GET(request: NextRequest) {
         }
 
         const verseData = await verseResponse.json();
+        const content = verseData.data?.content?.trim() || '';
+        
+        if (!content) {
+          console.warn(`Empty content for verse ${verseInfo.id}, full response:`, JSON.stringify(verseData).substring(0, 200));
+        }
 
         return {
           id: `${bookId}-${chapter}-${verseNumber}`,
@@ -121,7 +126,7 @@ export async function GET(request: NextRequest) {
           bookId: bookId,
           chapter: parseInt(chapter),
           verse: verseNumber,
-          text: verseData.data.content?.trim() || '',
+          text: content,
         };
       })
     );
