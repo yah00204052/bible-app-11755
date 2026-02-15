@@ -116,8 +116,14 @@ export async function GET(request: NextRequest) {
         const verseData = await verseResponse.json();
         const content = verseData.data?.content?.trim() || '';
         
-        if (!content) {
-          console.warn(`Empty content for verse ${verseInfo.id}, full response:`, JSON.stringify(verseData).substring(0, 200));
+        // Log first verse of chapter to debug structure
+        if (verseNumber === 1) {
+          console.log(`First verse (${verseInfo.id}) response structure:`, {
+            hasData: !!verseData.data,
+            dataKeys: verseData.data ? Object.keys(verseData.data) : [],
+            content: content ? 'present' : 'BLANK',
+            fullVerse: verseData.data ? JSON.stringify(verseData.data).substring(0, 300) : 'NO DATA'
+          });
         }
 
         return {
