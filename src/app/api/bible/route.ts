@@ -67,9 +67,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Fetch all verses for the chapter with content in one request
+    // Fetch verse list first
     const versesResponse = await fetch(
-      `${BIBLE_API_URL}/bibles/${bibleId}/chapters/${apiBookId}.${chapter}/verses?content-type=text&include-notes=false&include-titles=false&include-chapter-numbers=false&include-verse-numbers=false&include-verse-spans=false`,
+      `${BIBLE_API_URL}/bibles/${bibleId}/chapters/${apiBookId}.${chapter}/verses`,
       {
         headers: {
           'api-key': BIBLE_API_KEY,
@@ -86,18 +86,45 @@ export async function GET(request: NextRequest) {
 
     const versesData = await versesResponse.json();
 
-    // Transform verses data directly
-    const verses = versesData.data.map((verseInfo: any) => {
-      const verseNumber = parseInt(verseInfo.id.split('.')[2]);
-      return {
-        id: `${bookId}-${chapter}-${verseNumber}`,
-        orgId: bookId,
-        bookId: bookId,
-        chapter: parseInt(chapter),
-        verse: verseNumber,
-        text: verseInfo.content?.trim() || '',
-      };
-    });
+    // Fetch each verse individually to get the text content
+    const verses = await Promise.all(
+      versesData.data.map(async (verseInfo: any) => {
+        const verseNumber = parseInt(verseInfo.id.split('.')[2]);
+
+        // Fetch individual verse with content
+        const verseResponse = await fetch(
+          `${BIBLE_API_URL}/bibles/${bibleId}/verses/${verseInfo.id}?content-type=text&include-notes=false&include-titles=false&include-chapter-numbers=false&include-verse-numbers=false&include-verse-spans=false`,
+          {
+            headers: {
+              'api-key': BIBLE_API_KEY,
+            },
+            cache: 'force-cache',
+          }
+        );
+
+        if (!verseResponse.ok) {
+          return {
+            id: `${bookId}-${chapter}-${verseNumber}`,
+            orgId: bookId,
+            bookId: bookId,
+            chapter: parseInt(chapter),
+            verse: verseNumber,
+            text: '',
+          };
+        }
+
+        const verseData = await verseResponse.json();
+
+        return {
+          id: `${bookId}-${chapter}-${verseNumber}`,
+          orgId: bookId,
+          bookId: bookId,
+          chapter: parseInt(chapter),
+          verse: verseNumber,
+          text: verseData.data.content?.trim() || '',
+        };
+      })
+    );
 
     return NextResponse.json({ verses });
   } catch (error) {
