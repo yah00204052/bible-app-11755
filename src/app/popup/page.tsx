@@ -179,7 +179,7 @@ export default function PopupPage() {
                 verseElement.style.backgroundColor = '#fef08a';
                 setTimeout(() => {
                   verseElement.style.backgroundColor = '';
-                }, 5000);
+                }, 60000);
               }
             }, 300);
           }
@@ -209,7 +209,7 @@ export default function PopupPage() {
         verseElement.style.backgroundColor = '#fef08a';
         setTimeout(() => {
           verseElement.style.backgroundColor = '';
-        }, 2000);
+        }, 60000);
       }
     }
   }, [selectedVerse, verses, bookId, chapter]);
